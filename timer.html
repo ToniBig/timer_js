@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Tino Bog">
+    <title>Timer</title>
+
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .svg-container {
+            flex-grow: 1;
+            /* Take up all available space */
+            display: flex;
+            align-items: center;
+            /* Center SVG vertically */
+            justify-content: center;
+            /* Center SVG horizontally */
+            overflow: hidden;
+            /* Prevents overflow */
+            max-height: calc(100% - 50px);
+            /* Adjust based on control panel height */
+        }
+
+        .svg-container svg {
+            max-width: 100%;
+            /* Limit width to container */
+            max-height: 100%;
+            /* Limit height to container */
+            height: auto;
+            /* Maintain aspect ratio */
+            width: auto;
+            /* Maintain aspect ratio */
+        }
+
+        .controls {
+            background-color: green;
+            display: flex;
+
+            justify-content: center;
+            /* Center controls horizontally */
+            gap: 10px;
+            /* Spacing between controls */
+            padding: 10px;
+            background-color: #f1f1f1;
+            /* Light grey background */
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
+            /* Shadow effect */
+            height: 50px;
+            /* Fixed height for control panel */
+        }
+
+        input,
+        button {
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="svg-container">
+        <svg viewBox="0 0 100 100">
+
+            <g id="numbers"></g>
+            <g id="major_tiks"></g>
+            <g id="minor_tiks"></g>
+            <path id="timeWedge" fill="red" />
+        </svg>
+    </div>
+    <div class="controls">
+        <input type="number" id="timeInput" placeholder="Time in minutes" min="1" max="60">
+        <button id="playPauseButton">Play/Pause</button>
+        <button id="resetButton">Reset</button>
+    </div>
+
+    <audio id="timerSound" src="alarm.wav" preload="auto"></audio>
+</body>
+
+<script>
+    const center_x = 50;
+    const center_y = 50;
+    const text_radius = 45;
+
+    const major_tick_width = 1;
+    const major_tick_length = 5;
+    const minor_tick_width = 0.5;
+    const minor_tick_length = 3;
+    const major_tick_radius = 35;
+    const minor_tick_radius = 34.25;
+
+    const major_min = 0;
+    const major_max = 55;
+    const major_delta = 5;
+
+    const minor_min = 0;
+    const minor_max = 60;
+    const minor_delta = 1;
+
+    const max_time = 60; // Total time in minutes
+    const progress_radius = 35;
+
+    let clock_is_running = false;
+
+    // Retrieve value when the page loads
+    window.onload = function () {
+
+        // Create numbers
+        create_numbers(major_min, major_max, major_delta, "numbers");
+        // Major ticks
+        create_ticks(major_min, major_max, major_delta, major_tick_radius, major_tick_width, major_tick_length, "major_tiks");
+        // Minor ticks
+        create_ticks(minor_min, minor_max, minor_delta, minor_tick_radius, minor_tick_width, minor_tick_length, "minor_tiks");
+
+        // Get last set run time
+        let defined_run_time = localStorage.getItem('timerValue');
+        if (!defined_run_time) {
+            defined_run_time = 5;
+        }
+
+        var timer = null;
+        var remaining_run_time = defined_run_time; // in minutes
+        var start_time = 0; // in milliseconds
+        const interval = 10;
+
+        // Update elements
+        document.getElementById("timeInput").value = defined_run_time;
+        draw_wedge(defined_run_time);
+
+        // Connect play pause button
+        document.getElementById("playPauseButton").addEventListener("click", function () {
+            clock_is_running = !clock_is_running;
+
+            update_model();
+        });
+
+        function update_model() {
+            if (clock_is_running) {
+                start_time = Date.now() + remaining_run_time * 60000;
+                timer = setInterval(updateWedge, interval); // Update every second
+                console.log("Starting timer");
+            }
+            else {
+                clearInterval(timer);
+                remaining_run_time = (start_time - Date.now()) / 60000;
+                console.log("Pausing timer");
+            }
+
+            document.getElementById("resetButton").disabled = clock_is_running;
+        }
+
+        // Connect reset button
+        document.getElementById("resetButton").addEventListener("click", function () {
+            remaining_run_time = defined_run_time; // in minutes
+            draw_wedge(defined_run_time);
+        });
+
+        // connecting input field
+        document.getElementById("timeInput").addEventListener("input", function () {
+            defined_run_time = document.getElementById("timeInput").value;
+            localStorage.setItem('timerValue', defined_run_time);
+            remaining_run_time = defined_run_time; // in minutes
+            draw_wedge(defined_run_time);
+        });
+
+
+        function updateWedge() {
+            var time_left = (start_time - Date.now()) / 60000; // in minutes
+
+            console.log(`time left: ${time_left}`);
+
+            draw_wedge(time_left);
+
+            if (time_left <= 0) {
+                clearInterval(timer);
+                var sound = document.getElementById("timerSound");
+                sound.play();
+                clock_is_running = false;
+                update_model();
+            }
+        }
+    };
+
+    function draw_wedge(remaining_time) {
+        var angle = Math.min((remaining_time / max_time) * 360, 360);
+        var wedgePath = calculateWedgePath(angle, center_x, center_y, progress_radius); // Function to calculate the wedge path
+        document.getElementById("timeWedge").setAttribute("d", wedgePath);
+    }
+
+    function calculateWedgePath(angle, cx, cy, radius) {
+        console.log(`angle: ${angle}`);
+
+        if (angle == 360) {
+            return `M ${cx} ${cy - radius} 
+             A ${radius} ${radius} 0 0,1 ${cx} ${cy + radius}
+             A ${radius} ${radius} 0 0,1 ${cx} ${cy - radius}
+             Z`;
+        }
+
+        // Convert the angle to radians
+        let radians = (- angle - 90) * Math.PI / 180;
+
+        // Calculate the x and y coordinates for the end point of the arc
+        let x = cx + radius * Math.cos(radians);
+        let y = cy + radius * Math.sin(radians);
+
+        // Determine if the arc should be greater than 180 degrees
+        let largeArcFlag = angle > 180 ? 1 : 0;
+
+        // Start at the center of the circle, draw a line to the circumference,
+        // describe an arc, then draw a line back to the center
+
+        let d_attribute = `M ${cx} ${cy} L ${x} ${y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${cx} ${cy - radius} Z`;
+
+        return d_attribute;
+    }
+
+    function create_numbers(major_min, major_max, major_delta, group) {
+
+        for (let number = major_min; number <= major_max; number += major_delta) {
+            let angle = 360 - (number / 60) * 360 - 90; // -90 to start from the top
+            let radians = angle * Math.PI / 180;
+            let x = center_x + text_radius * Math.cos(radians);
+            let y = center_y + text_radius * Math.sin(radians);
+
+            let textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            textElement.setAttribute("x", x);
+            textElement.setAttribute("y", y);
+            textElement.setAttribute("font-size", "10");
+            textElement.setAttribute("font-family", "Arial");
+            textElement.setAttribute("text-anchor", "middle");
+            textElement.setAttribute("dominant-baseline", "central"); // Vertically center
+            textElement.textContent = number;
+
+            document.getElementById(group).appendChild(textElement);
+        }
+    }
+
+    function create_ticks(min, max, delta, radius, width, length, group) {
+        // Create numbers and major tics
+        for (let number = min; number <= max; number += delta) {
+            let angle = (number / 60) * 360;
+            let radians = angle * Math.PI / 180;
+
+            // Creating tick marks
+            let tickX = center_x + (radius + length / 2) * Math.cos(radians) - width / 2;
+            let tickY = center_y + (radius + length / 2) * Math.sin(radians) - width / 2;
+
+            let rectElement = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rectElement.setAttribute("x", tickX);
+            rectElement.setAttribute("y", tickY);
+            rectElement.setAttribute("width", width);
+            rectElement.setAttribute("height", length);
+            rectElement.setAttribute("transform", `rotate(${angle + 90}, ${tickX + width / 2}, ${tickY + width / 2})`);
+            rectElement.style.fill = "black";
+
+            document.getElementById(group).appendChild(rectElement);
+        }
+    }
+</script>
+
+</html>
