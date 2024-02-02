@@ -43,9 +43,7 @@
         }
 
         .controls {
-            background-color: green;
             display: flex;
-
             justify-content: center;
             /* Center controls horizontally */
             gap: 10px;
@@ -71,7 +69,6 @@
 <body>
     <div class="svg-container">
         <svg viewBox="0 0 100 100">
-
             <g id="numbers"></g>
             <g id="major_tiks"></g>
             <g id="minor_tiks"></g>
@@ -107,93 +104,95 @@
     const minor_max = 60;
     const minor_delta = 1;
 
-    const max_time = 60; // Total time in minutes
+    const max_time_min = 60; // Total time in minutes
     const progress_radius = 35;
 
+    let timer = null;
+    let defined_run_time_min = 0;
+    let remaining_run_time_min = 0; // in minutes
+    let start_time_ms = 0; // in milliseconds
+
+    const interval = 10;
     let clock_is_running = false;
 
-    // Retrieve value when the page loads
-    window.onload = function () {
+    document.addEventListener('DOMContentLoaded', function () {
 
-        // Create numbers
+        // Initialization code
         create_numbers(major_min, major_max, major_delta, "numbers");
-        // Major ticks
         create_ticks(major_min, major_max, major_delta, major_tick_radius, major_tick_width, major_tick_length, "major_tiks");
-        // Minor ticks
         create_ticks(minor_min, minor_max, minor_delta, minor_tick_radius, minor_tick_width, minor_tick_length, "minor_tiks");
 
-        // Get last set run time
-        let defined_run_time = localStorage.getItem('timerValue');
-        if (!defined_run_time) {
-            defined_run_time = 5;
+        defined_run_time_min = localStorage.getItem('timerValue') || 5;
+        remaining_run_time_min = defined_run_time_min; // in minutes
+        start_time_ms = 0; // in milliseconds
+        document.getElementById("timeInput").value = defined_run_time_min;
+        draw_wedge(defined_run_time_min);
+
+        // Attach event listeners
+        document.getElementById("playPauseButton").addEventListener("click", toggleClock);
+        document.getElementById("resetButton").addEventListener("click", resetClock);
+        document.getElementById("timeInput").addEventListener("input", updateTimer);
+
+    });
+
+    function update_model() {
+        if (clock_is_running) {
+            start_time_ms = Date.now() + remaining_run_time_min * 60000;
+            timer = setInterval(updateWedge, interval);
+            console.log("Starting timer");
+        }
+        else {
+            clearInterval(timer);
+            remaining_run_time_min = (start_time_ms - Date.now()) / 60000;
+            console.log("Pausing timer");
         }
 
-        var timer = null;
-        var remaining_run_time = defined_run_time; // in minutes
-        var start_time = 0; // in milliseconds
-        const interval = 10;
+        document.getElementById("resetButton").disabled = clock_is_running;
+    }
 
-        // Update elements
-        document.getElementById("timeInput").value = defined_run_time;
-        draw_wedge(defined_run_time);
+    function toggleClock() {
+        clock_is_running = !clock_is_running;
 
-        // Connect play pause button
-        document.getElementById("playPauseButton").addEventListener("click", function () {
-            clock_is_running = !clock_is_running;
+        if (parseFloat(remaining_run_time_min) <= 0) {
+            resetClock();
+        }
 
+        update_model();
+    }
+
+    function resetClock() {
+        remaining_run_time_min = defined_run_time_min; // in minutes
+        draw_wedge(defined_run_time_min);
+    }
+
+    function updateTimer() {
+        defined_run_time_min = parseFloat(document.getElementById("timeInput").value);
+        localStorage.setItem('timerValue', defined_run_time_min);
+        clock_is_running = false;
+        update_model();
+        resetClock();
+    }
+
+    function updateWedge() {
+        let time_left_ms = (start_time_ms - Date.now()) / 60000; // in minutes
+
+        console.log(`time left: ${time_left_ms}`);
+
+        draw_wedge(time_left_ms);
+
+        if (time_left_ms <= 0) {
+            clearInterval(timer);
+            let sound = document.getElementById("timerSound");
+            sound.play();
+            clock_is_running = false;
+            remaining_run_time_min = 0;
             update_model();
-        });
-
-        function update_model() {
-            if (clock_is_running) {
-                start_time = Date.now() + remaining_run_time * 60000;
-                timer = setInterval(updateWedge, interval); // Update every second
-                console.log("Starting timer");
-            }
-            else {
-                clearInterval(timer);
-                remaining_run_time = (start_time - Date.now()) / 60000;
-                console.log("Pausing timer");
-            }
-
-            document.getElementById("resetButton").disabled = clock_is_running;
         }
-
-        // Connect reset button
-        document.getElementById("resetButton").addEventListener("click", function () {
-            remaining_run_time = defined_run_time; // in minutes
-            draw_wedge(defined_run_time);
-        });
-
-        // connecting input field
-        document.getElementById("timeInput").addEventListener("input", function () {
-            defined_run_time = document.getElementById("timeInput").value;
-            localStorage.setItem('timerValue', defined_run_time);
-            remaining_run_time = defined_run_time; // in minutes
-            draw_wedge(defined_run_time);
-        });
-
-
-        function updateWedge() {
-            var time_left = (start_time - Date.now()) / 60000; // in minutes
-
-            console.log(`time left: ${time_left}`);
-
-            draw_wedge(time_left);
-
-            if (time_left <= 0) {
-                clearInterval(timer);
-                var sound = document.getElementById("timerSound");
-                sound.play();
-                clock_is_running = false;
-                update_model();
-            }
-        }
-    };
+    }
 
     function draw_wedge(remaining_time) {
-        var angle = Math.min((remaining_time / max_time) * 360, 360);
-        var wedgePath = calculateWedgePath(angle, center_x, center_y, progress_radius); // Function to calculate the wedge path
+        let angle = Math.min((remaining_time / max_time_min) * 360, 360);
+        let wedgePath = calculateWedgePath(angle, center_x, center_y, progress_radius); // Function to calculate the wedge path
         document.getElementById("timeWedge").setAttribute("d", wedgePath);
     }
 
